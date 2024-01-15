@@ -5,7 +5,8 @@ from .log import logger
 from .stdout_wrapper import SAFE_STDOUT
 
 
-python = ".\\venv\\python.exe"
+#python = ".\\venv\\python.exe"
+python = "python3"
 
 print(python)
 
