@@ -19,13 +19,15 @@ from common.stdout_wrapper import SAFE_STDOUT
 # 指定本地目录
 local_dir_root = "./models_from_modelscope"
 model_dir = snapshot_download('damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch', cache_dir=local_dir_root)
+model_dir_punc_ct = snapshot_download('damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch', cache_dir=local_dir_root)
+model_dir_vad = snapshot_download('damo/speech_fsmn_vad_zh-cn-16k-common-pytorch', cache_dir=local_dir_root)
 
 
 inference_pipeline = pipeline(
     task=Tasks.auto_speech_recognition,
     model=model_dir,
-    vad_model='damo/speech_fsmn_vad_zh-cn-16k-common-pytorch',
-    punc_model='damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch',
+    vad_model=model_dir_vad,
+    punc_model=model_dir_punc_ct,
     #lm_model='damo/speech_transformer_lm_zh-cn-common-vocab8404-pytorch',
     #lm_weight=0.15,
     #beam_size=10,
@@ -61,6 +63,11 @@ if __name__ == "__main__":
         "--language", type=str, default="ja", choices=["ja", "en", "zh"]
     )
     parser.add_argument("--model_name", type=str, required=True)
+
+
+    parser.add_argument("--input_file", type=str, default="./wavs/")
+
+    parser.add_argument("--file_pos", type=str, default="")
     
 
     args = parser.parse_args()
@@ -70,8 +77,16 @@ if __name__ == "__main__":
     language = args.language
 
 
+    input_file = args.input_file
+
+    if input_file == "":
+        input_file = "./wavs/"
+
+    file_pos = args.file_pos
+
+
     wav_files = [
-        f for f in os.listdir("./wavs/") if f.endswith(".wav")
+        f for f in os.listdir(f"{input_file}") if f.endswith(".wav")
     ]
 
 
@@ -88,9 +103,9 @@ if __name__ == "__main__":
         for wav_file in tqdm(wav_files, file=SAFE_STDOUT):
             file_name = os.path.basename(wav_file)
             
-            text = transcribe_one("./wavs/"+wav_file)
+            text = transcribe_one(f"{input_file}"+wav_file)
 
-            f.write(f"{file_name}|{speaker_name}|{language_id}|{text}\n")
+            f.write(file_pos+f"{file_name}|{speaker_name}|{language_id}|{text}\n")
 
             f.flush()
     sys.exit(0)

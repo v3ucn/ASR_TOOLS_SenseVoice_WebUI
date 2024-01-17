@@ -41,25 +41,15 @@ def do_slice(
     return "切分完毕"
 
 
-def do_transcribe(
-    model_name,mytype,language
+def do_transcribe_whisper(
+    model_name,mytype,language,input_file,file_pos
 ):
     if model_name == "":
         return "Error: 角色名不能为空"
     
-
-    cmd_py = "short_audio_transcribe_ali.py"
-
-    if mytype == "Whisper":
     
-        cmd_py = "short_audio_transcribe_whisper.py"
+    cmd_py = "short_audio_transcribe_whisper.py"
 
-    elif mytype == "必剪asr":
-
-        cmd_py = "short_audio_transcribe_bcut.py"
-
-
-    
 
     success, message = run_script_with_log(
         [
@@ -68,6 +58,44 @@ def do_transcribe(
             model_name,
             "--language",
             language,
+            "--mytype",
+            mytype,"--input_file",
+            input_file,
+            "--file_pos",
+            file_pos,
+
+        ]
+    )
+    if not success:
+        return f"Error: {message}"
+    return "转写完毕"
+
+
+def do_transcribe_all(
+    model_name,mytype,language,input_file,file_pos
+):
+    if model_name == "":
+        return "Error: 角色名不能为空"
+    
+
+    cmd_py = "short_audio_transcribe_ali.py"
+
+
+    if mytype == "bcut":
+
+        cmd_py = "short_audio_transcribe_bcut.py"
+
+    success, message = run_script_with_log(
+        [
+            cmd_py,
+            "--model_name",
+            model_name,
+            "--language",
+            language,
+            "--input_file",
+            input_file,
+            "--file_pos",
+            file_pos,
 
         ]
     )
@@ -86,7 +114,7 @@ initial_md = """
 
 with gr.Blocks(theme="NoCrypt/miku") as app:
     gr.Markdown(initial_md)
-    model_name = gr.Textbox(label="角色名")
+    model_name = gr.Textbox(label="角色名",placeholder="请输入角色名")
     
     with gr.Accordion("音频素材切割"):
         with gr.Row():
@@ -101,7 +129,7 @@ with gr.Blocks(theme="NoCrypt/miku") as app:
                 min_silence_dur_ms = gr.Slider(
                     minimum=500,
                     maximum=5000,
-                    value=700,
+                    value=500,
                     step=100,
                     label="max_sil_kept长度",
                 )
@@ -113,9 +141,19 @@ with gr.Blocks(theme="NoCrypt/miku") as app:
             
             language = gr.Dropdown(["ja", "en", "zh"], value="zh", label="选择转写的语言")
 
-            mytype = gr.Dropdown(["阿里达摩院asr", "Whisper","必剪asr"], value="阿里达摩院asr", label="选择转写的软件")
+            mytype = gr.Dropdown(["medium","large-v3","large-v2"], value="medium", label="选择Whisper模型")
+
+            input_file = gr.Textbox(label="切片所在目录",placeholder="不填默认为./wavs目录")
             
-        transcribe_button = gr.Button("开始转写")
+            file_pos = gr.Textbox(label="切片名称前缀",placeholder="不填只有切片文件名")
+            
+        transcribe_button_whisper = gr.Button("Whisper开始转写")
+
+        transcribe_button_ali = gr.Button("阿里ASR开始转写")
+
+        transcribe_button_bcut = gr.Button("必剪ASR开始转写")
+
+
         result2 = gr.Textbox(label="結果")
 
     slice_button.click(
@@ -123,12 +161,38 @@ with gr.Blocks(theme="NoCrypt/miku") as app:
         inputs=[model_name, min_sec, max_sec, min_silence_dur_ms],
         outputs=[result1],
     )
-    transcribe_button.click(
-        do_transcribe,
+    transcribe_button_whisper.click(
+        do_transcribe_whisper,
         inputs=[
             model_name,
             mytype,
-            language,
+            language,input_file,file_pos
+        ],
+        outputs=[result2],
+    )
+
+
+    ali = gr.Text(value="ali",visible=False)
+
+    bcut = gr.Text(value="bcut",visible=False)
+
+
+    transcribe_button_ali.click(
+        do_transcribe_all,
+        inputs=[
+            model_name,
+            ali,
+            language,input_file,file_pos
+        ],
+        outputs=[result2],
+    )
+
+    transcribe_button_bcut.click(
+        do_transcribe_all,
+        inputs=[
+            model_name,
+            bcut,
+            language,input_file,file_pos
         ],
         outputs=[result2],
     )

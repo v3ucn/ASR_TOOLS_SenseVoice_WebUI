@@ -66,6 +66,10 @@ if __name__ == "__main__":
         "--language", type=str, default="ja", choices=["ja", "en", "zh"]
     )
     parser.add_argument("--model_name", type=str, required=True)
+
+    parser.add_argument("--input_file", type=str, default="./wavs/")
+
+    parser.add_argument("--file_pos", type=str, default="")
     
 
     args = parser.parse_args()
@@ -74,9 +78,16 @@ if __name__ == "__main__":
 
     language = args.language
 
+    input_file = args.input_file
+
+    if input_file == "":
+        input_file = "./wavs/"
+
+    file_pos = args.file_pos
+
 
     wav_files = [
-        f for f in os.listdir("./wavs/") if f.endswith(".wav")
+        f for f in os.listdir(f"{input_file}") if f.endswith(".wav")
     ]
 
 
@@ -93,9 +104,9 @@ if __name__ == "__main__":
         for wav_file in tqdm(wav_files, file=SAFE_STDOUT):
             file_name = os.path.basename(wav_file)
             
-            text = transcribe_one("./wavs/"+wav_file)
+            text = transcribe_one(f"{input_file}"+wav_file)
 
-            f.write(f"{file_name}|{speaker_name}|{language_id}|{text}\n")
+            f.write(file_pos+f"{file_name}|{speaker_name}|{language_id}|{text}\n")
 
             f.flush()
     sys.exit(0)
