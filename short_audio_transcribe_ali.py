@@ -22,6 +22,14 @@ model_dir = snapshot_download('damo/speech_paraformer-large_asr_nat-zh-cn-16k-co
 model_dir_punc_ct = snapshot_download('damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch', cache_dir=local_dir_root)
 model_dir_vad = snapshot_download('damo/speech_fsmn_vad_zh-cn-16k-common-pytorch', cache_dir=local_dir_root)
 
+model_dir_ja = snapshot_download('damo/speech_UniASR_asr_2pass-ja-16k-common-vocab93-tensorflow1-offline', cache_dir=local_dir_root)
+
+
+model_dir_en = snapshot_download('damo/speech_UniASR_asr_2pass-en-16k-common-vocab1080-tensorflow1-offline', cache_dir=local_dir_root)
+
+
+
+
 
 inference_pipeline = pipeline(
     task=Tasks.auto_speech_recognition,
@@ -39,6 +47,29 @@ extensions = ['wav']
 
 
 
+inference_pipeline_ja = pipeline(
+    task=Tasks.auto_speech_recognition,
+    model=model_dir_ja,
+   # vad_model=model_dir_vad,
+  #  punc_model=model_dir_punc_ct,
+    #lm_model='damo/speech_transformer_lm_zh-cn-common-vocab8404-pytorch',
+    #lm_weight=0.15,
+    #beam_size=10,
+)
+
+
+inference_pipeline_en = pipeline(
+    task=Tasks.auto_speech_recognition,
+    model=model_dir_en,
+   # vad_model=model_dir_vad,
+  #  punc_model=model_dir_punc_ct,
+    #lm_model='damo/speech_transformer_lm_zh-cn-common-vocab8404-pytorch',
+    #lm_weight=0.15,
+    #beam_size=10,
+)
+
+
+
 lang2token = {
             'zh': "ZH|",
             'ja': "JP|",
@@ -46,9 +77,15 @@ lang2token = {
         }
 
 
-def transcribe_one(audio_path):
+def transcribe_one(audio_path,language):
+
+    if language == "zh":
     
-    rec_result = inference_pipeline(audio_in=audio_path, param_dict=param_dict)
+        rec_result = inference_pipeline(audio_in=audio_path, param_dict=param_dict)
+    elif language == "ja":
+        rec_result = inference_pipeline_ja(audio_in=audio_path, param_dict=param_dict)
+    else:
+        rec_result = inference_pipeline_en(audio_in=audio_path, param_dict=param_dict)
 
     print(rec_result["text"])
 
@@ -103,7 +140,7 @@ if __name__ == "__main__":
         for wav_file in tqdm(wav_files, file=SAFE_STDOUT):
             file_name = os.path.basename(wav_file)
             
-            text = transcribe_one(f"{input_file}"+wav_file)
+            text = transcribe_one(f"{input_file}"+wav_file,language)
 
             f.write(file_pos+f"{file_name}|{speaker_name}|{language_id}|{text}\n")
 
