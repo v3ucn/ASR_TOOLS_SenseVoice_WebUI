@@ -137,10 +137,10 @@ tokenizers==0.15.0
 tomli==2.0.1
 tomlkit==0.12.0
 toolz==0.12.0
-torch==2.1.2+cu118
-torch-complex==0.4.3
-torchaudio==2.1.2
-torchvision==0.16.2+cu118
+torch
+torch-complex
+torchaudio
+torchvision
 tqdm==4.66.1
 transformers==4.36.2
 typer==0.9.0
