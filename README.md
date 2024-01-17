@@ -21,3 +21,5 @@ python3 webui_dataset.py
 ## 视频攻略
 
 https://www.bilibili.com/video/BV1da4y117Y6/
+
+## 必剪项目官方地址：SocialSisterYi/bcut-asr: 使用必剪API的语音字幕识别 (github.com)
