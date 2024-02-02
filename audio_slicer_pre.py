@@ -13,7 +13,7 @@ parser.add_argument(
     "--max_sec", "-M", type=int, default=5000, help="Maximum seconds of a slice"
 )
 parser.add_argument(
-    "--model_name",
+    "--dataset_path",
     type=str,
     default="inputs",
     help="Directory of input wav files",
@@ -38,7 +38,7 @@ else:
     os.makedirs(folder_path)
 
 # 遍历指定目录下的所有.wav文件
-audio_directory = f'{args.model_name}'
+audio_directory = f'{args.dataset_path}'
 for filename in os.listdir(audio_directory):
     file_path = os.path.join(audio_directory, filename)
     if os.path.isfile(file_path) and filename.endswith('.wav'):

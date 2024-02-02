@@ -11,21 +11,21 @@ dataset_root = ".\\raw\\"
 
 
 def do_slice(
-    model_name: str,
+    dataset_path: str,
     min_sec: int,
     max_sec: int,
     min_silence_dur_ms: int,
 ):
-    if model_name == "":
-        return "Error: 角色名不能为空"
+    if dataset_path == "":
+        return "Error: 数据集路径不能为空"
     logger.info("Start slicing...")
-    output_dir = os.path.join(dataset_root, model_name, ".\\wavs")
+    output_dir = os.path.join(dataset_root, dataset_path, ".\\wavs")
 
 
     cmd = [
         "audio_slicer_pre.py",
-        "--model_name",
-        model_name,
+        "--dataset_path",
+        dataset_path,
         "--min_sec",
         str(min_sec),
         "--max_sec",
@@ -115,6 +115,8 @@ initial_md = """
 with gr.Blocks(theme="NoCrypt/miku") as app:
     gr.Markdown(initial_md)
     model_name = gr.Textbox(label="角色名",placeholder="请输入角色名")
+    ##add by hyh 添加一个数据集路径的文本框
+    dataset_path = gr.Textbox(label="数据集路径",placeholder="设置切割数据集样本路径")
     
     with gr.Accordion("音频素材切割"):
         with gr.Row():
@@ -158,7 +160,7 @@ with gr.Blocks(theme="NoCrypt/miku") as app:
 
     slice_button.click(
         do_slice,
-        inputs=[model_name, min_sec, max_sec, min_silence_dur_ms],
+        inputs=[dataset_path, min_sec, max_sec, min_silence_dur_ms],
         outputs=[result1],
     )
     transcribe_button_whisper.click(
@@ -212,4 +214,4 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-app.launch(inbrowser=not args.no_autolaunch, server_name=args.server_name)
+app.launch(inbrowser=not args.no_autolaunch, server_name=args.server_name, server_port=7971)
