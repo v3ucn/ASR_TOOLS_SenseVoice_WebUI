@@ -223,7 +223,7 @@ initial_md = """
 
 with gr.Blocks(theme="NoCrypt/miku") as app:
     gr.Markdown(initial_md)
-    model_name = gr.Textbox(label="角色名",placeholder="请输入角色名")
+    model_name = gr.Textbox(label="角色名",placeholder="请输入角色名",visible=False)
 
 
     with gr.Accordion("干声抽离和降噪"):
