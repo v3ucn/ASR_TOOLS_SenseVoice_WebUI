@@ -238,7 +238,7 @@ with gr.Blocks(theme="NoCrypt/miku") as app:
     with gr.Accordion("音频素材切割"):
         with gr.Row():
             ##add by hyh 添加一个数据集路径的文本框
-            dataset_path = gr.Textbox(label="数据集路径",placeholder="设置切割数据集样本路径")
+            dataset_path = gr.Textbox(label="音频素材所在路径，默认在项目的raw文件夹,支持批量角色切分",placeholder="设置音频素材所在路径",value="./raw/")
             with gr.Column():
                 
                 min_sec = gr.Slider(
