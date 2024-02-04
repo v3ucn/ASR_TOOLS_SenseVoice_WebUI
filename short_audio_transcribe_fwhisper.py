@@ -1,6 +1,6 @@
 import os
 import argparse
-import whisper
+
 import torch
 
 from tqdm import tqdm
@@ -15,10 +15,11 @@ import re
 
 from transformers import pipeline
 
+from faster_whisper import WhisperModel
+
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 model = None
-
 
 lang2token = {
             'zh': "ZH|",
@@ -49,55 +50,17 @@ def transcribe_bela(audio_path):
 
 
 def transcribe_one(audio_path,mytype):
-    # load audio and pad/trim it to fit 30 seconds
-    audio = whisper.load_audio(audio_path)
-    audio = whisper.pad_or_trim(audio)
-
-    # make log-Mel spectrogram and move to the same device as the model
-
-    if mytype == "large-v3":
-
-        mel = whisper.log_mel_spectrogram(audio,n_mels=128).to(model.device)
-
-    else:
-
-        mel = whisper.log_mel_spectrogram(audio).to(model.device)
-
-
-    # detect the spoken language
-    _, probs = model.detect_language(mel)
-    print(f"Detected language: {max(probs, key=probs.get)}")
-    lang = max(probs, key=probs.get)
-    # decode the audio
-
-
-    if lang == "zh":
-
-
-        if torch.cuda.is_available():
-            options = whisper.DecodingOptions(beam_size=5,prompt="生于忧患，死于欢乐。不亦快哉！")
-        else:
-            options = whisper.DecodingOptions(beam_size=5,fp16 = False,prompt="生于忧患，死于欢乐。不亦快哉！")
-
-    else:
-
     
+    segments, info = model.transcribe(audio_path, beam_size=5,vad_filter=True,vad_parameters=dict(min_silence_duration_ms=500),)
+    print("Detected language '%s' with probability %f" % (info.language, info.language_probability))
 
-        if torch.cuda.is_available():
-            options = whisper.DecodingOptions(beam_size=5)
-        else:
-            options = whisper.DecodingOptions(beam_size=5,fp16 = False)
+    text_str = ""
+    for segment in segments:
+        text_str += f"{segment.text.lstrip()},"
+    print(text_str.rstrip(","))
 
+    return text_str.rstrip(","),info.language
 
-
-
-
-
-    result = whisper.decode(model, mel, options)
-
-    # print the recognized text
-    print(result.text)
-    return result.text,max(probs, key=probs.get)
 
 
 if __name__ == "__main__":
@@ -134,12 +97,13 @@ if __name__ == "__main__":
 
     file_pos = args.file_pos
 
-    try:
-        model = whisper.load_model(mytype,download_root="./whisper_model/")
-    except Exception as e:
-
-        print(str(e))
-        print("中文特化逻辑")
+    if device == "cuda":
+        try:
+            model = WhisperModel(mytype, device="cuda", compute_type="float16",download_root="./whisper_model",local_files_only=False)
+        except Exception as e:
+            model = WhisperModel(mytype, device="cuda", compute_type="int8_float16",download_root="./whisper_model",local_files_only=False)
+    else:
+        model = WhisperModel(mytype, device="cpu", compute_type="int8",download_root="./whisper_model",local_files_only=False)
 
 
     wav_files = [

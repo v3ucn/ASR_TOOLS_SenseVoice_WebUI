@@ -1,6 +1,7 @@
 import os
 import argparse
-
+import whisper
+import torch
 
 from tqdm import tqdm
 import sys
@@ -16,6 +17,8 @@ from common.constants import Languages
 from common.log import logger
 from common.stdout_wrapper import SAFE_STDOUT
 
+import re
+
 # 指定本地目录
 local_dir_root = "./models_from_modelscope"
 model_dir = snapshot_download('damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch', cache_dir=local_dir_root)
@@ -27,7 +30,7 @@ model_dir_ja = snapshot_download('damo/speech_UniASR_asr_2pass-ja-16k-common-voc
 
 model_dir_en = snapshot_download('damo/speech_UniASR_asr_2pass-en-16k-common-vocab1080-tensorflow1-offline', cache_dir=local_dir_root)
 
-
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 
@@ -69,6 +72,9 @@ inference_pipeline_en = pipeline(
 )
 
 
+model = whisper.load_model("medium",download_root="./whisper_model/")
+
+
 
 lang2token = {
             'zh': "ZH|",
@@ -78,6 +84,12 @@ lang2token = {
 
 
 def transcribe_one(audio_path,language):
+
+    audio = whisper.load_audio(audio_path)
+    audio = whisper.pad_or_trim(audio)
+    mel = whisper.log_mel_spectrogram(audio).to(model.device)
+    _, probs = model.detect_language(mel)
+    language = max(probs, key=probs.get)
 
     if language == "zh":
     
@@ -89,7 +101,7 @@ def transcribe_one(audio_path,language):
 
     print(rec_result["text"])
 
-    return rec_result["text"]
+    return rec_result["text"],language
 
 
 if __name__ == "__main__":
@@ -127,22 +139,28 @@ if __name__ == "__main__":
     ]
 
 
-    if language == "ja":
-        language_id = Languages.JP
-    elif language == "en":
-        language_id = Languages.EN
-    elif language == "zh":
-        language_id = Languages.ZH
-    else:
-        raise ValueError(f"{language} is not supported.")
-
     with open("./esd.list", "w", encoding="utf-8") as f:
         for wav_file in tqdm(wav_files, file=SAFE_STDOUT):
             file_name = os.path.basename(wav_file)
             
-            text = transcribe_one(f"{input_file}"+wav_file,language)
+            text,lang = transcribe_one(f"{input_file}"+wav_file,language)
 
-            f.write(file_pos+f"{file_name}|{speaker_name}|{language_id}|{text}\n")
+            # 使用正则表达式提取'deedee'
+            match = re.search(r'(^.*?)_.*?(\..*?$)', wav_file)
+            if match:
+                extracted_name = match.group(1) + match.group(2)
+            else:
+                print("No match found")
+                extracted_name = "sample"
+
+            if lang == "ja":
+                language_id = "JA"
+            elif lang == "en":
+                language_id = "EN"
+            elif lang == "zh":
+                language_id = "ZH"
+
+            f.write(file_pos+f"{file_name}|{extracted_name.replace('.wav','')}|{language_id}|{text}\n")
 
             f.flush()
     sys.exit(0)

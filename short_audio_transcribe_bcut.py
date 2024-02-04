@@ -13,6 +13,17 @@ from common.stdout_wrapper import SAFE_STDOUT
 from bcut_asr import BcutASR
 from bcut_asr.orm import ResultStateEnum
 
+import whisper
+import torch
+
+import re
+
+
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+
+model = whisper.load_model("medium",download_root="./whisper_model/")
+
 
 
 lang2token = {
@@ -23,6 +34,12 @@ lang2token = {
 
 
 def transcribe_one(audio_path):
+
+    audio = whisper.load_audio(audio_path)
+    audio = whisper.pad_or_trim(audio)
+    mel = whisper.log_mel_spectrogram(audio).to(model.device)
+    _, probs = model.detect_language(mel)
+    language = max(probs, key=probs.get)
 
     asr = BcutASR(audio_path)
     asr.upload() # 上传文件
@@ -52,9 +69,9 @@ def transcribe_one(audio_path):
         print(text)
 
         # 输出srt格式
-        return text
+        return text,language
     else:
-        return "必剪无法识别"
+        return "必剪无法识别",language
     
 
 
@@ -91,22 +108,28 @@ if __name__ == "__main__":
     ]
 
 
-    if language == "ja":
-        language_id = Languages.JP
-    elif language == "en":
-        language_id = Languages.EN
-    elif language == "zh":
-        language_id = Languages.ZH
-    else:
-        raise ValueError(f"{language} is not supported.")
-
     with open("./esd.list", "w", encoding="utf-8") as f:
         for wav_file in tqdm(wav_files, file=SAFE_STDOUT):
             file_name = os.path.basename(wav_file)
-            
-            text = transcribe_one(f"{input_file}"+wav_file)
 
-            f.write(file_pos+f"{file_name}|{speaker_name}|{language_id}|{text}\n")
+            # 使用正则表达式提取'deedee'
+            match = re.search(r'(^.*?)_.*?(\..*?$)', wav_file)
+            if match:
+                extracted_name = match.group(1) + match.group(2)
+            else:
+                print("No match found")
+                extracted_name = "sample"
+            
+            text,lang = transcribe_one(f"{input_file}"+wav_file)
+
+            if lang == "ja":
+                language_id = "JA"
+            elif lang == "en":
+                language_id = "EN"
+            elif lang == "zh":
+                language_id = "ZH"
+
+            f.write(file_pos+f"{file_name}|{extracted_name.replace('.wav','')}|{language_id}|{text}\n")
 
             f.flush()
     sys.exit(0)
