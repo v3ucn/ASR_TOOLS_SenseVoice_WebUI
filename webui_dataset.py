@@ -19,22 +19,11 @@ dataset_root = ".\\raw\\"
 
 
 
-
-
-# 字幕语音切分
-inference_pipeline = pipeline(
-    task=Tasks.auto_speech_recognition,
-    model='damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch',
-    vad_model='damo/speech_fsmn_vad_zh-cn-16k-common-pytorch',
-    punc_model='damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch',
-    ncpu=16,
-)
 sd_pipeline = pipeline(
     task='speaker-diarization',
     model='damo/speech_campplus_speaker-diarization_common',
     model_revision='v1.0.0'
 )
-audio_clipper = VideoClipper(inference_pipeline, sd_pipeline)
 
 def audio_change(audio):
 
@@ -257,65 +246,31 @@ with gr.Blocks(theme="NoCrypt/miku") as app:
                 slice_button = gr.Button("开始切分")
             result1 = gr.Textbox(label="結果")
 
-    with gr.Accordion("音频素材手动按字幕切割"):
-        audio_state = gr.State()
+    
+
+
+    with gr.Accordion("音频批量转写，转写文件存放在根目录的est.list"):
         with gr.Row():
             with gr.Column():
-                # oaudio_input = gr.Audio(label="🔊音频输入 44100hz Audio Input",type="filepath")
-                # rec_audio = gr.Button("👂重新采样")
-                audio_input = gr.Audio(label="🔊音频输入 16000hz Audio Input")
-                audio_sd_switch = gr.Radio(["no", "yes"], label="👥是否区分说话人 Recognize Speakers", value='no')
-                recog_button1 = gr.Button("👂识别 Recognize")
-                audio_text_output = gr.Textbox(label="✏️识别结果 Recognition Result")
-                audio_srt_output = gr.Textbox(label="📖SRT字幕内容 RST Subtitles")
-            with gr.Column():
-                audio_text_input = gr.Textbox(label="✏️待裁剪文本 Text to Clip (多段文本使用'#'连接)")
-                audio_spk_input = gr.Textbox(label="✏️待裁剪说话人 Speaker to Clip (多个说话人使用'#'连接)")
-                with gr.Row():
-                    audio_start_ost = gr.Slider(minimum=-500, maximum=1000, value=0, step=50, label="⏪开始位置偏移 Start Offset (ms)")
-                    audio_end_ost = gr.Slider(minimum=-500, maximum=1000, value=0, step=50, label="⏩结束位置偏移 End Offset (ms)")
-                with gr.Row():
-                    clip_button1 = gr.Button("✂️裁剪 Clip")
-                    write_button1 = gr.Button("写入转写文件")
-                audio_output = gr.Audio(label="🔊裁剪结果 Audio Clipped")
-                audio_mess_output = gr.Textbox(label="ℹ️裁剪信息 Clipping Log")
-                audio_srt_clip_output = gr.Textbox(label="📖裁剪部分SRT字幕内容 Clipped RST Subtitles")
+                
+                language = gr.Dropdown(["ja", "en", "zh","ko","yue"], value="zh", label="选择转写的语言")
 
-            audio_input.change(inputs=audio_input, outputs=audio_input, fn=audio_change)
+                mytype = gr.Dropdown(["small","medium","large-v3","large-v2"], value="medium", label="选择Whisper模型")
 
-            write_button1.click(write_list,[audio_text_input,audio_output],[])
-            
-            # rec_audio.click(re_write,[oaudio_input],[rec_audio])
-            recog_button1.click(audio_recog, 
-                            inputs=[audio_input, audio_sd_switch],
-                            outputs=[audio_text_output, audio_srt_output, audio_state])
-            clip_button1.click(audio_clip, 
-                            inputs=[audio_text_input, audio_spk_input, audio_start_ost, audio_end_ost, audio_state], 
-                            outputs=[audio_output, audio_mess_output, audio_srt_clip_output])
+                input_file = gr.Textbox(label="切片所在目录",placeholder="不填默认为./wavs目录")
+                
+                file_pos = gr.Textbox(label="切片名称前缀",placeholder="不填只有切片文件名")
+                
+            transcribe_button_whisper = gr.Button("Whisper开始转写")
+
+            transcribe_button_fwhisper = gr.Button("Faster-Whisper开始转写")
+
+            transcribe_button_ali = gr.Button("阿里SenseVoice开始转写")
+
+            transcribe_button_bcut = gr.Button("必剪ASR开始转写")
 
 
-
-    with gr.Row():
-        with gr.Column():
-            
-            language = gr.Dropdown(["ja", "en", "zh"], value="zh", label="选择转写的语言")
-
-            mytype = gr.Dropdown(["small","medium","large-v3","large-v2"], value="medium", label="选择Whisper模型")
-
-            input_file = gr.Textbox(label="切片所在目录",placeholder="不填默认为./wavs目录")
-            
-            file_pos = gr.Textbox(label="切片名称前缀",placeholder="不填只有切片文件名")
-            
-        transcribe_button_whisper = gr.Button("Whisper开始转写")
-
-        transcribe_button_fwhisper = gr.Button("Faster-Whisper开始转写")
-
-        transcribe_button_ali = gr.Button("阿里ASR开始转写")
-
-        transcribe_button_bcut = gr.Button("必剪ASR开始转写")
-
-
-        result2 = gr.Textbox(label="結果")
+            result2 = gr.Textbox(label="結果")
 
     slice_button.click(
         do_slice,

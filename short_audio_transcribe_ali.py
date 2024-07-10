@@ -6,11 +6,7 @@ import torch
 from tqdm import tqdm
 import sys
 import os
-from modelscope.pipelines import pipeline
-from modelscope.utils.constant import Tasks
 
-
-from modelscope.hub.snapshot_download import snapshot_download
 
 
 from common.constants import Languages
@@ -19,89 +15,164 @@ from common.stdout_wrapper import SAFE_STDOUT
 
 import re
 
-# 指定本地目录
-local_dir_root = "./models_from_modelscope"
-model_dir = snapshot_download('damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch', cache_dir=local_dir_root)
-model_dir_punc_ct = snapshot_download('damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch', cache_dir=local_dir_root)
-model_dir_vad = snapshot_download('damo/speech_fsmn_vad_zh-cn-16k-common-pytorch', cache_dir=local_dir_root)
-
-model_dir_ja = snapshot_download('damo/speech_UniASR_asr_2pass-ja-16k-common-vocab93-tensorflow1-offline', cache_dir=local_dir_root)
-
-
-model_dir_en = snapshot_download('damo/speech_UniASR_asr_2pass-en-16k-common-vocab1080-tensorflow1-offline', cache_dir=local_dir_root)
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
+from funasr import AutoModel
 
-inference_pipeline = pipeline(
-    task=Tasks.auto_speech_recognition,
-    model=model_dir,
-    vad_model=model_dir_vad,
-    punc_model=model_dir_punc_ct,
-    #lm_model='damo/speech_transformer_lm_zh-cn-common-vocab8404-pytorch',
-    #lm_weight=0.15,
-    #beam_size=10,
-)
-param_dict = {}
-param_dict['use_timestamp'] = False
-# folderpath = sys.argv[1]
-extensions = ['wav']
+model_dir = "iic/SenseVoiceSmall"
 
 
+emo_dict = {
+	"<|HAPPY|>": "😊",
+	"<|SAD|>": "😔",
+	"<|ANGRY|>": "😡",
+	"<|NEUTRAL|>": "",
+	"<|FEARFUL|>": "😰",
+	"<|DISGUSTED|>": "🤢",
+	"<|SURPRISED|>": "😮",
+}
 
-inference_pipeline_ja = pipeline(
-    task=Tasks.auto_speech_recognition,
-    model=model_dir_ja,
-   # vad_model=model_dir_vad,
-  #  punc_model=model_dir_punc_ct,
-    #lm_model='damo/speech_transformer_lm_zh-cn-common-vocab8404-pytorch',
-    #lm_weight=0.15,
-    #beam_size=10,
-)
+event_dict = {
+	"<|BGM|>": "🎼",
+	"<|Speech|>": "",
+	"<|Applause|>": "👏",
+	"<|Laughter|>": "😀",
+	"<|Cry|>": "😭",
+	"<|Sneeze|>": "🤧",
+	"<|Breath|>": "",
+	"<|Cough|>": "🤧",
+}
 
+emoji_dict = {
+	"<|nospeech|><|Event_UNK|>": "❓",
+	"<|zh|>": "",
+	"<|en|>": "",
+	"<|yue|>": "",
+	"<|ja|>": "",
+	"<|ko|>": "",
+	"<|nospeech|>": "",
+	"<|HAPPY|>": "😊",
+	"<|SAD|>": "😔",
+	"<|ANGRY|>": "😡",
+	"<|NEUTRAL|>": "",
+	"<|BGM|>": "🎼",
+	"<|Speech|>": "",
+	"<|Applause|>": "👏",
+	"<|Laughter|>": "😀",
+	"<|FEARFUL|>": "😰",
+	"<|DISGUSTED|>": "🤢",
+	"<|SURPRISED|>": "😮",
+	"<|Cry|>": "😭",
+	"<|EMO_UNKNOWN|>": "",
+	"<|Sneeze|>": "🤧",
+	"<|Breath|>": "",
+	"<|Cough|>": "😷",
+	"<|Sing|>": "",
+	"<|Speech_Noise|>": "",
+	"<|withitn|>": "",
+	"<|woitn|>": "",
+	"<|GBG|>": "",
+	"<|Event_UNK|>": "",
+}
 
-inference_pipeline_en = pipeline(
-    task=Tasks.auto_speech_recognition,
-    model=model_dir_en,
-   # vad_model=model_dir_vad,
-  #  punc_model=model_dir_punc_ct,
-    #lm_model='damo/speech_transformer_lm_zh-cn-common-vocab8404-pytorch',
-    #lm_weight=0.15,
-    #beam_size=10,
-)
+lang_dict =  {
+    "<|zh|>": "<|lang|>",
+    "<|en|>": "<|lang|>",
+    "<|yue|>": "<|lang|>",
+    "<|ja|>": "<|lang|>",
+    "<|ko|>": "<|lang|>",
+    "<|nospeech|>": "<|lang|>",
+}
 
-
-model = whisper.load_model("medium",download_root="./whisper_model/")
-
-
+emo_set = {"😊", "😔", "😡", "😰", "🤢", "😮"}
+event_set = {"🎼", "👏", "😀", "😭", "🤧", "😷",}
 
 lang2token = {
             'zh': "ZH|",
             'ja': "JP|",
             "en": "EN|",
+            "ko": "KO|",
+            "yue": "YUE|",
         }
 
+def format_str(s):
+	for sptk in emoji_dict:
+		s = s.replace(sptk, emoji_dict[sptk])
+	return s
+
+
+def format_str_v2(s):
+	sptk_dict = {}
+	for sptk in emoji_dict:
+		sptk_dict[sptk] = s.count(sptk)
+		s = s.replace(sptk, "")
+	emo = "<|NEUTRAL|>"
+	for e in emo_dict:
+		if sptk_dict[e] > sptk_dict[emo]:
+			emo = e
+	for e in event_dict:
+		if sptk_dict[e] > 0:
+			s = event_dict[e] + s
+	s = s + emo_dict[emo]
+
+	for emoji in emo_set.union(event_set):
+		s = s.replace(" " + emoji, emoji)
+		s = s.replace(emoji + " ", emoji)
+	return s.strip()
+
+def format_str_v3(s):
+	def get_emo(s):
+		return s[-1] if s[-1] in emo_set else None
+	def get_event(s):
+		return s[0] if s[0] in event_set else None
+
+	s = s.replace("<|nospeech|><|Event_UNK|>", "❓")
+	for lang in lang_dict:
+		s = s.replace(lang, "<|lang|>")
+	s_list = [format_str_v2(s_i).strip(" ") for s_i in s.split("<|lang|>")]
+	new_s = " " + s_list[0]
+	cur_ent_event = get_event(new_s)
+	for i in range(1, len(s_list)):
+		if len(s_list[i]) == 0:
+			continue
+		if get_event(s_list[i]) == cur_ent_event and get_event(s_list[i]) != None:
+			s_list[i] = s_list[i][1:]
+		#else:
+		cur_ent_event = get_event(s_list[i])
+		if get_emo(s_list[i]) != None and get_emo(s_list[i]) == get_emo(new_s):
+			new_s = new_s[:-1]
+		new_s += s_list[i].strip().lstrip()
+	new_s = new_s.replace("The.", " ")
+	return new_s.strip()
 
 def transcribe_one(audio_path,language):
 
-    audio = whisper.load_audio(audio_path)
-    audio = whisper.pad_or_trim(audio)
-    mel = whisper.log_mel_spectrogram(audio).to(model.device)
-    _, probs = model.detect_language(mel)
-    language = max(probs, key=probs.get)
+    model = AutoModel(model=model_dir,
+                  vad_model="fsmn-vad",
+                  vad_kwargs={"max_single_segment_time": 30000},
+                  trust_remote_code=True, device="cuda:0")
 
-    if language == "zh":
-    
-        rec_result = inference_pipeline(audio_in=audio_path, param_dict=param_dict)
-    elif language == "ja":
-        rec_result = inference_pipeline_ja(audio_in=audio_path, param_dict=param_dict)
-    else:
-        rec_result = inference_pipeline_en(audio_in=audio_path, param_dict=param_dict)
+    res = model.generate(
+        input=audio_path,
+        cache={},
+        language=language, # "zn", "en", "yue", "ja", "ko", "nospeech"
+        use_itn=False,
+        batch_size_s=0, 
+    )
 
-    print(rec_result["text"])
+    try:
 
-    return rec_result["text"],language
+        text = res[0]["text"]
+        text = format_str_v3(text)
+        print(text)
+    except Exception as e:
+        print(e)
+        text = ""
+
+
+    return text,language
 
 
 if __name__ == "__main__":
@@ -109,7 +180,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--language", type=str, default="ja", choices=["ja", "en", "zh"]
+        "--language", type=str, default="ja", choices=["ja", "en", "zh","yue","ko"]
     )
     parser.add_argument("--model_name", type=str, required=True)
 
@@ -159,6 +230,10 @@ if __name__ == "__main__":
                 language_id = "EN"
             elif lang == "zh":
                 language_id = "ZH"
+            elif lang == "yue":
+                language_id = "YUE"
+            elif lang == "ko":
+                language_id = "KO"
 
             f.write(file_pos+f"{file_name}|{extracted_name.replace('.wav','')}|{language_id}|{text}\n")
 
