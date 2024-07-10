@@ -17,6 +17,8 @@ pip install -r requirements.txt
 ```
 python3 webui_dataset.py
 ```
+![PixPin_2024-07-10_13-57-16](https://github.com/v3ucn/ASR_TOOLS_WebUI/assets/1288038/cc1f019a-647e-4076-895e-18dfba1ad2e5)
+
 
 ## 视频攻略
 
